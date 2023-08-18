@@ -23,6 +23,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -44,7 +46,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.newscreenactivity.ui.theme.NewScreenActivityTheme
+import com.example.newscreenactivity.ui.theme.data.AppDatabase
+import com.example.newscreenactivity.ui.theme.data.SelectedMenu
 import com.google.android.engage.common.datamodel.Image
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -113,11 +119,23 @@ fun HomeScreen(navController: NavController) {
 }
 @Composable
 fun DetailsScreen(navController: NavController) {
-    var selectedMenu by remember { mutableStateOf("") }
+    val context = LocalContext.current
+    val database = remember { AppDatabase.getDatabase(context) }
 
-    if (selectedMenu.isEmpty()) {
-        val menuList = listOf("한식", "양식", "일식", "중식")
-        selectedMenu = menuList.random()
+    val selectedMenuDao = remember { database.selectedMenuDao() }
+
+    val storedSelectedMenu: SelectedMenu? = runBlocking {
+        selectedMenuDao.getSelectedMenu()
+    }
+
+    var selectedMenu by remember {
+        val menu = if (storedSelectedMenu != null) {
+            storedSelectedMenu.menu
+        } else {
+            val menuList = listOf("한식", "양식", "일식", "중식")
+            menuList.random()
+        }
+        mutableStateOf(menu)
     }
 
     val buttonText = if (selectedMenu.isNotEmpty()) {
@@ -157,6 +175,10 @@ fun DetailsScreen(navController: NavController) {
                 Button(
                     onClick = {
                         selectedMenu = getRandomMenuExceptSelected(selectedMenu)
+
+                        runBlocking {
+                            selectedMenuDao.insertMenu(SelectedMenu(menu = selectedMenu))
+                        }
                     }
                 ) {
                     Text("다시 뽑기")
@@ -182,8 +204,6 @@ fun getRandomMenuExceptSelected(selected: String): String {
 
 @Composable
 fun NextScreen(navController: NavController, selectedMenu: String) {
-    var recommendedDish by remember { mutableStateOf("") }
-
     val koreanDishes = listOf("불고기 덮밥", "된장찌개", "생선조림", "김치찌개", "냉면", "삼계탕", "비빔밥", "제육덮밥", "김치볶음밥", "닭볶음탕", "갈비찜", "장어덮밥",
         "돼지불백", "닭곰탕", "순두부찌개", "생선구이", "메밀전병", "돼지고기 두루치기", "감자탕", "비빔밥", "육개장", "떡만두국", "해물순두부찌개", "순대국밥", "보쌈", "족발",
         "삼겹살", "대패삼겹살", "오리주물럭", "해물뚝배기", "전복죽", "뚝불고기", "육회", "회", "회덮밥", "물회", "돼지갈비", "소갈비", "낙지볶음", "조개찜", "동태찌개", "낙지볶음밥",
@@ -197,12 +217,31 @@ fun NextScreen(navController: NavController, selectedMenu: String) {
     val japaneseDishes = listOf("초밥", "덴뿌라", "우동", "라멘", "가츠동", "돈부리", "오니기리", "샤브샤브", "소바", "부타동", "나베", "오야꼬동", "에비동", "돈코츠라멘", "텐동",
         "히레카츠동", "가라아게", "오마카세", "사시미", "샤브샤브", "오꼬노미야끼", "고로케")
 
-    when (selectedMenu) {
-        "한식" -> recommendedDish = koreanDishes.random()
-        "양식" -> recommendedDish = westernDishes.random()
-        "중식" -> recommendedDish = chineseDishes.random()
-        "일식" -> recommendedDish = japaneseDishes.random()
+    var recommendedDish by remember {
+        val initDish = when (selectedMenu) {
+            "한식" -> koreanDishes.random()
+            "양식" -> westernDishes.random()
+            "중식" -> chineseDishes.random()
+            "일식" -> japaneseDishes.random()
+            else -> ""
+        }
+        mutableStateOf(initDish)
     }
+
+//    LaunchedEffect(Unit) {
+//        repeat(30) {
+//            delay(50)
+//            recommendedDish = when (selectedMenu) {
+//                "한식" -> koreanDishes.random()
+//                "양식" -> westernDishes.random()
+//                "중식" -> chineseDishes.random()
+//                "일식" -> japaneseDishes.random()
+//                else -> ""
+//            }
+//        }
+//    }
+
+
 
     val buttonText = "추천 메뉴는 '$recommendedDish'입니다!"
 
