@@ -13,4 +13,7 @@ interface SelectedMenuDao {
 
     @Query("SELECT * FROM selected_menu WHERE id = 0")
     suspend fun getSelectedMenu(): SelectedMenu?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertOrUpdateMenu(selectedMenu: SelectedMenu)
 }
